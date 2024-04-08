@@ -1,0 +1,230 @@
+---
+title: "Oryzomys antillarum Body Size Estimation -Hopkins 2008 paper"
+author: "Alexandra Boville"
+date: "2024-04-07"
+output: html_document
+---
+
+ORYZOMYS ANTILLARUM DATA BELOWWWWWW
+
+USE WITH CODE FROM DATA REPLICATION ASSIGNMENT
+
+```{r}
+oa <- read_csv("~/Desktop/Oa_measurments for body size prediction.csv", col_names = TRUE)
+
+oa
+```
+
+
+```{r}
+
+oa_numeric <- oa %>% 
+  mutate(LTRL = as.numeric(`LTRL`)) %>% 
+  select(Specimen, Locality, LTRL)
+  
+oa_numeric
+
+oa_body_mass <- predict(interspecies_lm, newdata = oa_numeric, interval = "confidence",
+    level = 0.95)
+
+oa_confidence_BM <- exp(oa_body_mass)
+
+oa_confidence_BM <- as.tibble(oa_confidence_BM)
+oa_confidence_BM
+
+ 
+oa_confidence_BM <- cbind(oa,oa_confidence_BM) 
+oa_confidence_BM
+
+oa_confidence_BM_locality <- oa_confidence_BM %>% 
+  group_by(Locality) %>% 
+   summarize(
+    Mass = mean(`fit`),
+    LTRL = mean(LTRL))
+
+oa_confidence_BM_locality
+  
+
+
+```
+
+```{r}
+rodent_sigmodontinae <- rodent_with_RTRA %>% 
+  filter(subclade == "Sigmodontinae" )
+
+rodent_sigmodontinae
+
+rodent_sigmodontinae_avg <-  rodent_sigmodontinae %>% 
+  mutate(Mass = as.numeric(`mass (g)`), 
+         Pub_avg_mass = as.numeric(`pub. avg. mass (g)`), 
+         RTRA = as.numeric(`RTRA`)) %>% #change data for Mass, Published Average Mass, and Retangular Toothrow Area from type chr to dbl
+  group_by(Species) %>% #grouping data by Species
+  tidyr::fill(Pub_avg_mass, .direction ="down") %>% #filling in NA's in published averaged masses to make the following code happy
+  #"The average body mass reported by Ernest (2003) was used for 3 species (Hydrochoerus hydrochaeris, Graphiurus murinus, and Cryptomys hottentotus) for which museum specimens lacked data on body mass." - Copied from Hopkins 2008
+  mutate(Mass = coalesce(Mass,Pub_avg_mass)) %>% #Sub NA values for Mass with Previously published mass averages
+  summarize(
+    Mass = mean(`Mass`), #averages mass for each species
+    LTRL = mean(`LTRL (mm)`), #averages toothrow length for each species
+    `Toothrow_Width` = mean(`M1 width (mm)`), #averages toothrow width (based off of M1 width) for each species
+    RTRA = mean(RTRA)
+    ) %>% 
+  mutate(across(where(is.numeric), ~ round(., 2))) # rounding data to only have two decimal places
+
+rodent_sigmodontinae_avg
+```
+
+```{r}
+rodent_sigmodontinae_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_sigmodontinae_avg)
+
+summary(rodent_sigmodontinae_lm)
+
+oa_BM_sigmodontineae <- predict(rodent_sigmodontinae_lm, newdata = oa_numeric, interval = "confidence",
+    level = 0.95)
+
+oa_BM_sigmodontineae_exp <- exp(oa_BM_sigmodontineae)
+
+oa_BM_sigmodontineae_exp <- as.tibble(oa_BM_sigmodontineae_exp)
+oa_BM_sigmodontineae_exp
+
+oa_BM_sigmodontineae_exp <- cbind(oa,oa_BM_sigmodontineae_exp) 
+oa_BM_sigmodontineae_exp
+
+oa_BM_sigmodontineae_locality <- oa_BM_sigmodontineae_exp %>% 
+  group_by(Locality) %>% 
+   summarize(
+    Mass = mean(`fit`),
+    LTRL = mean(LTRL))
+oa_BM_sigmodontineae_locality
+
+```
+```{r}
+rodent_sigmodontinae_rtra_lm <- lm(log(Mass) ~ log(RTRA), data = rodent_sigmodontinae_avg)
+
+summary(rodent_sigmodontinae_rtra_lm)
+
+
+oa_BM_sigmodontineae_rtra <- predict(rodent_sigmodontinae_rtra_lm, newdata = oa_numeric_RTRA, interval = "confidence",
+    level = 0.95)
+
+oa_BM_sigmodontineae_rtra <- exp(oa_BM_sigmodontineae_rtra)
+
+oa_BM_sigmodontineae_rtra <- as.tibble(oa_BM_sigmodontineae_rtra)
+oa_BM_sigmodontineae_rtra
+
+oa_BM_sigmodontineae_rtra <- cbind(oa,oa_BM_sigmodontineae_rtra) 
+oa_BM_sigmodontineae_rtra
+
+oa_BM_sigmodontineae_locality_rtra <- oa_BM_sigmodontineae_rtra %>% 
+  group_by(Locality) %>% 
+   summarize(
+    Mass = mean(`fit`),
+    RTRA = mean(RTRA))
+oa_BM_sigmodontineae_locality_rtra
+
+```
+
+
+
+```{r}
+ ggplot() + 
+  geom_point(data = rodent_avg, aes(x = log(LTRL),y = log(Mass))) +
+  geom_point(data = oa_confidence_BM, aes(x = log(LTRL), y = log(fit), fill = Locality), color = "black" ,shape = 21) +
+  geom_point(data = rodent_sigmodontinae_avg, aes(x = log(LTRL), y = log(Mass)), fill = "red", shape = 21) +
+  geom_smooth(data = rodent_avg, method = "lm", aes(x = log(LTRL),y = log(Mass))) +
+  labs(x = "log(LTRL)", y = "log(Mass)") +
+  theme_classic()
+
+ ggplot() + 
+  geom_point(data = rodent_avg, aes(x = log(LTRL),y = log(Mass)), size = 3) +
+  geom_point(data = oa_confidence_BM, aes(x = log(LTRL), y = log(fit), fill = Locality), color = "black" , size = 3, shape = 21) +
+  geom_point(data = rodent_sigmodontinae_avg, aes(x = log(LTRL), y = log(Mass)), fill = "red", size = 3, shape = 21) +
+  labs(x = "log(LTRL)", y = "log(Mass)") +
+  theme_classic()
+ 
+
+ggplot() +
+  geom_point(data = oa_confidence_BM, aes(x = log(LTRL), y = log(fit), fill = Locality), color = "black" ,size = 5, shape = 21) +
+  geom_point(data = rodent_sigmodontinae_avg, aes(x = log(LTRL), y = log(Mass)), fill = "black",size = 5, shape = 21) +
+   geom_smooth(data = rodent_sigmodontinae_avg, method = "lm", aes(x = log(LTRL),y = log(Mass))) +
+  labs(x = "log(LTRL)", y = "log(Mass)") +
+  theme_classic()
+
+
+ggplot() +
+  geom_point(data = oa_confidence_BM, aes(x = log(LTRL), y = log(fit), fill = Locality), color = "black" , size = 5, shape = 21) +
+  labs(x = "log(LTRL)", y = "log(Mass)") +
+  theme(axis.text=element_text(size=20), legend.text = element_text(size=40)) +
+  theme_classic()
+```
+RTRA ALL SPECIES LM
+```{r}
+interspecies_rtra_lm <- lm(log(Mass) ~ log(RTRA), data = rodent_avg)
+
+s_RTRA <- summary(interspecies_rtra_lm)
+tidy(s, conf.int = TRUE)
+
+tidy(interspecies_rtra_lm)
+glance(interspecies_rtra_lm)
+
+
+p_All_RTRA <- ggplot(data = rodent_avg, aes(x = log(RTRA), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,7) +
+  ylim(0,12) +
+  theme_classic(base_size = 16)
+
+p_All_RTRA
+```
+Predict Body Mass with RTRA
+```{r}
+
+oa_numeric_RTRA <- oa %>% 
+  mutate(LTRL = as.numeric(`RTRA`)) %>% 
+  select(Specimen, Locality, RTRA)
+  
+oa_body_mass_rtra <- predict(interspecies_rtra_lm, newdata = oa_numeric_RTRA, interval = "confidence",
+    level = 0.95)
+
+
+
+oa_confidence_BM_RTRA <- exp(oa_body_mass_rtra)
+
+oa_confidence_BM_RTRA <- as.tibble(oa_confidence_BM_RTRA)
+oa_confidence_BM_RTRA
+
+ 
+oa_confidence_BM_RTRA <- cbind(oa,oa_confidence_BM_RTRA) 
+oa_confidence_BM_RTRA
+
+oa_confidence_BM_locality_RTRA <- oa_confidence_BM_RTRA %>% 
+  group_by(Locality) %>% 
+   summarize(
+    Mass = mean(`fit`),
+    RTRA = mean(RTRA))
+
+oa_confidence_BM_locality_RTRA
+  
+```
+
+```{r}
+ ggplot() + 
+  geom_point(data = rodent_avg, aes(x = log(RTRA),y = log(Mass)), size = 3) +
+  geom_point(data = oa_confidence_BM_RTRA, aes(x = log(RTRA), y = log(fit), fill = Locality), color = "black" , size = 3, shape = 21) +
+  geom_point(data = rodent_sigmodontinae_avg, aes(x = log(RTRA), y = log(Mass)), fill = "red", size = 3,shape = 21) +
+  labs(x = "log(RTRA)", y = "log(Mass)") +
+  theme_classic()
+
+ggplot() +
+  geom_point(data = oa_confidence_BM_RTRA, aes(x = log(RTRA), y = log(fit), fill = Locality), color = "black" , size = 5, shape = 21) +
+  geom_point(data = rodent_sigmodontinae_avg, aes(x = log(RTRA), y = log(Mass)), fill = "black",  size = 5,shape = 21) +
+  labs(x = "log(RTRA)", y = "log(Mass)") +
+  theme_classic()
+
+
+ggplot() +
+  geom_point(data = oa_confidence_BM_RTRA, aes(x = log(RTRA), y = log(fit), fill = Locality), color = "black" , size = 5, shape = 21) +
+  labs(x = "log(RTRA)", y = "log(Mass)") +
+  theme(axis.text=element_text(size=20), legend.text = element_text(size=40)) +
+  theme_classic()
+```

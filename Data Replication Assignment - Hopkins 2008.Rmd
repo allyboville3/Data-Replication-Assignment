@@ -1,0 +1,302 @@
+---
+title: "Data Replication Assignment - Hopkins 2008"
+author: "Alexandra Boville"
+date: "2024-03-25"
+output: html_document
+---
+
+# Data Analysis Replication Assignment
+
+## Information About the Publication 
+### Hopkins 2008: REASSESSING THE MASS OF EXCEPTIONALLY LARGE RODENTS USING TOOTHROW LENGTH AND AREA AS PROXIES FOR BODY MASS
+
+A common tool used by paleontologists to understand the physiology, ecology and evolution of fossil mammals (and also fossil vertebrates) is reconstructing body size. In mammals in particular, this can be done using dimensions of the appendicular skeletal elements and dental morphology. For rodents in particular this most commonly is seen using the first lower molar (m1), but in this paper a proxy for body mass is developed using toothrow length and area for the dentary (lower jaw). 
+
+The main objective of this publication was to estimate body mass for extinct rodent taxa from dental toothrow length and area and determine the effectiveness of these proxies compared with previously published estimations of body mass from femur diameter. 
+
+Libraries Used
+```{r}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(cowplot)
+library(broom)
+
+library(stargazer)
+
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+
+library(jtools)
+```
+
+Loading in Dataset
+```{r}
+rodents <- "https://raw.githubusercontent.com/allyboville3/Data-Replication-Assignment/main/Hopkins%202008%20-%20Appendix1.csv"
+
+rodent_df <- read_csv(rodents, col_names = TRUE)
+
+head(rodent_df)
+```
+
+# Cleaning Up the Data for All Species Analysis
+
+## Create columns for Rectangular Toothrow Area (RTRA)
+RTRA  = (LTRL X M1 width)
+```{r}
+rodent_with_RTRA <- rodent_df %>% 
+  mutate(RTRA = (`LTRL (mm)` * `M1 width (mm)`))
+
+rodent_with_RTRA
+```
+
+## Averaging Values and Cleaning Up Spreadsheet for Interspecises Comparisons
+```{r}
+rodent_avg <- rodent_with_RTRA %>% 
+  mutate(Mass = as.numeric(`mass (g)`), Pub_avg_mass = as.numeric(`pub. avg. mass (g)`), RTRA = as.numeric(`RTRA`)) %>% #change data for Mass, Published Average Mass, and Retangular Toothrow Area from type chr to dbl
+  group_by(Species) %>% #grouping data by Species
+  tidyr::fill(Pub_avg_mass, .direction ="down") %>% #filling in NA's in published averaged masses to make the following code happy
+  #"The average body mass reported by Ernest (2003) was used for 3 species (Hydrochoerus hydrochaeris, Graphiurus murinus, and Cryptomys hottentotus) for which museum specimens lacked data on body mass." - Copied from Hopkins 2008
+  mutate(Mass = coalesce(Mass,Pub_avg_mass)) %>% #Sub NA values for Mass with Previously published mass averages
+  summarize(
+    Mass = mean(`Mass`), #averages mass for each species
+    LTRL = mean(`LTRL (mm)`), #averages toothrow length for each species
+    `Toothrow_Width` = mean(`M1 width (mm)`), #averages toothrow width (based off of M1 width) for each species
+    RTRA = mean(RTRA)
+    ) %>% 
+  mutate(across(where(is.numeric), ~ round(., 2))) # rounding data to only have two decimal places
+
+rodent_avg
+
+```
+# All Species
+## Running Regression Model for All Species
+```{r}
+interspecies_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_avg)
+
+
+s <- summary(interspecies_lm)
+tidy(s, conf.int = TRUE)
+
+tidy(interspecies_lm)
+glance(interspecies_lm)
+
+
+#stargazer(interspecies_lm, interspecies_small5kg_lm, type="text", title="Regression Results", align=TRUE, dep.var.labels= "OLS", column.labels=c("All Species","Species <5kg"), covariate.labels=c("Mass","LTRL"), keep.stat = c("ser"))
+
+
+
+```
+
+## Plotting Mass as a function of Lower toothrow length and Linear Model 
+```{r}
+p_All <- ggplot(data = rodent_avg, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,5) +
+  ylim(0,12) +
+  theme_classic(base_size = 16)
+
+p_All
+```
+# Species Less than 5kg
+Essentially is removing the four largest rodent species. This was done because for large rodents there may be different factors influencing dentition shape and size compared to smaller rodents. Including these larger taxa may result in the regression being misleading. 
+```{r}
+#removing four largest rodent species from data
+rodent_no_outlier <- rodent_avg %>% 
+  filter(!Species == "Erithizon dorsatum", !Species == "Castor canadensis", !Species == "Hydrochoeris hydrochoeris", !Species == "Cuniculus paca")
+
+rodent_no_outlier
+```
+## Running regression for Species separated by mass < 5kg
+```{r}
+interspecies_small5kg_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_no_outlier)
+
+tidy(interspecies_small5kg_lm)
+glance(interspecies_small5kg_lm)
+```
+
+## Plotting Mass as a funtion of LTRL for rodents with mass < 5kg
+```{r}
+p_no_outlier <- ggplot(data = rodent_no_outlier, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,4) +
+  ylim(0,9) +
+  theme_classic(base_size = 16)
+
+p_no_outlier
+```
+# Species less than 500g
+Filtering data to only all species with mass <500g
+```{r}
+rodent_smol <- rodent_avg %>% 
+  filter(Mass < 500)
+
+rodent_smol 
+```
+## Running regression for Species separated by mass < 500g
+
+```{r}
+interspecies_smol_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_smol)
+
+tidy(interspecies_smol_lm)
+glance(interspecies_smol_lm)
+```
+## Plotting mass as a function of LTRL for species with a mass < 500g 
+```{r}
+p_rodent_smol <- ggplot(data = rodent_smol, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,3) +
+  ylim(0,7) +
+  theme_classic(base_size = 16)
+
+p_rodent_smol
+```
+
+
+# Subclade Grouping 1 - Rodents within Muroidea 
+
+## Filtering Data to Retain only families within Muroidea
+Have to do so with original version os df because the subclade column was removed for previous code chunks
+```{r}
+rodent_muriods <- rodent_with_RTRA %>% 
+  filter(subclade == "Murinae" | subclade == "Neotominae" | subclade == "Arvicolinae" | subclade == "Deomyinae" | subclade == "Gerbillinae" | subclade == "Sigmodontinae" | subclade == "Spalacinae")
+
+rodent_muriods
+```
+## Creating a new df of averages based off of species in Muroidea subclades
+```{r}
+r_muriod_avg <-  rodent_muriods %>% 
+  mutate(Mass = as.numeric(`mass (g)`), 
+         Pub_avg_mass = as.numeric(`pub. avg. mass (g)`), 
+         RTRA = as.numeric(`RTRA`)) %>% #change data for Mass, Published Average Mass, and Retangular Toothrow Area from type chr to dbl
+  group_by(Species) %>% #grouping data by Species
+  tidyr::fill(Pub_avg_mass, .direction ="down") %>% #filling in NA's in published averaged masses to make the following code happy
+  #"The average body mass reported by Ernest (2003) was used for 3 species (Hydrochoerus hydrochaeris, Graphiurus murinus, and Cryptomys hottentotus) for which museum specimens lacked data on body mass." - Copied from Hopkins 2008
+  mutate(Mass = coalesce(Mass,Pub_avg_mass)) %>% #Sub NA values for Mass with Previously published mass averages
+  summarize(
+    Mass = mean(`Mass`), #averages mass for each species
+    LTRL = mean(`LTRL (mm)`), #averages toothrow length for each species
+    `Toothrow_Width` = mean(`M1 width (mm)`), #averages toothrow width (based off of M1 width) for each species
+    RTRA = mean(RTRA)
+    ) %>% 
+  mutate(across(where(is.numeric), ~ round(., 2))) # rounding data to only have two decimal places
+
+r_muriod_avg
+```
+
+## Muroid Rodents with masS <5kg
+Should be the same as the df above
+```{r}
+rodent_lt5kg_muroid <- r_muriod_avg %>% 
+  filter(Mass < 5000)
+
+rodent_lt5kg_muroid
+```
+
+## Running regression for Muroid rodents
+```{r}
+muroid_lt5kg_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_lt5kg_muroid)
+
+tidy(muroid_lt5kg_lm)
+glance(muroid_lt5kg_lm)
+
+p_muroid_lt5kg <- ggplot(data = rodent_lt5kg_muroid, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,3) +
+  ylim(0,8) +
+  theme_classic(base_size = 16)
+
+p_muroid_lt5kg
+
+```
+
+# Subclade Grouping 2 - Non-muroid Rodents
+
+## Filtering Data to be only non-muroid species
+```{r}
+rodent_non_muriods <- rodent_with_RTRA %>% 
+  filter(!subclade == "Murinae" , !subclade == "Neotominae" , !subclade == "Arvicolinae" , !subclade == "Deomyinae" , !subclade == "Gerbillinae" , !subclade == "Sigmodontinae" , !subclade == "Spalacinae")
+
+rodent_non_muriods
+```
+
+## Creating df of averages for non-muroid rodents
+```{r}
+r_non_muriod_avg <-  rodent_non_muriods %>% 
+  mutate(Mass = as.numeric(`mass (g)`), 
+         Pub_avg_mass = as.numeric(`pub. avg. mass (g)`), 
+         RTRA = as.numeric(`RTRA`)) %>% #change data for Mass, Published Average Mass, and Retangular Toothrow Area from type chr to dbl
+  group_by(Species) %>% #grouping data by Species
+  tidyr::fill(Pub_avg_mass, .direction ="down") %>% #filling in NA's in published averaged masses to make the following code happy
+  #"The average body mass reported by Ernest (2003) was used for 3 species (Hydrochoerus hydrochaeris, Graphiurus murinus, and Cryptomys hottentotus) for which museum specimens lacked data on body mass." - Copied from Hopkins 2008
+  mutate(Mass = coalesce(Mass,Pub_avg_mass)) %>% #Sub NA values for Mass with Previously published mass averages
+  summarize(
+    Mass = mean(`Mass`), #averages mass for each species
+    LTRL = mean(`LTRL (mm)`), #averages toothrow length for each species
+    `Toothrow_Width` = mean(`M1 width (mm)`), #averages toothrow width (based off of M1 width) for each species
+    RTRA = mean(RTRA)
+    ) %>% 
+  mutate(across(where(is.numeric), ~ round(., 2))) # rounding data to only have two decimal places
+
+r_non_muriod_avg
+```
+
+## Creating df of Non-muroid rodents of mass <5kg
+```{r}
+rodent_lt5kg_non_muroid <- r_non_muriod_avg %>% 
+  filter(Mass < 5000)
+
+rodent_lt5kg_non_muroid
+```
+
+## Running regression for non-muroid rodents of mass < 5kg and plotting mass as a function of LTRL
+```{r}
+non_muroid_lt5kg_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_lt5kg_non_muroid)
+
+tidy(non_muroid_lt5kg_lm)
+glance(non_muroid_lt5kg_lm)
+
+p_non_muroid_lt5kg <- ggplot(data = rodent_lt5kg_non_muroid, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,4) +
+  ylim(0,9) +
+  theme_classic(base_size = 16)
+
+p_non_muroid_lt5kg
+```
+
+```{r}
+#Making a nice table of Stats
+tab_model(interspecies_lm, interspecies_small5kg_lm, show.intercept = TRUE, show.est = TRUE, show.ci = 0.95, show.se = TRUE)
+
+```
+
+## Showing all plots together 
+```{r, fig.dim = c(10, 12)}
+detach("package:sjPlot", unload=TRUE) # detaching sjPlot package to remove conflicts with plot_grid function below
+
+bottom_square <- plot_grid(p_no_outlier, p_rodent_smol, p_non_muroid_lt5kg, p_muroid_lt5kg, 
+                          labels = c("B. <5kg", "C. <500g", "D. non-muroids <5kg", "E. muroids <5kg"),
+                          label_size = 16, 
+                          hjust = 0, 
+                          label_x = 0.15)
+
+
+plot_grid(p_All, bottom_square, labels = c("A. all species"), label_size = 16, ncol = 1, hjust = 0, 
+       label_x = 0.1, rel_heights = c(1, 1))
+```
+
+
+
+
+
+
+
+
+
