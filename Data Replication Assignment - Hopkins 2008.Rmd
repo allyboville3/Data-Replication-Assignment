@@ -188,7 +188,7 @@ r_muriod_avg <-  rodent_muriods %>%
 r_muriod_avg
 ```
 
-## Muroid Rodents with masS <5kg
+## Muroid Rodents with mass <5kg
 Should be the same as the df above
 ```{r}
 rodent_lt5kg_muroid <- r_muriod_avg %>% 
@@ -197,7 +197,7 @@ rodent_lt5kg_muroid <- r_muriod_avg %>%
 rodent_lt5kg_muroid
 ```
 
-## Running regression for Muroid rodents
+## Running regression for Muroid rodents <5kg
 ```{r}
 muroid_lt5kg_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_lt5kg_muroid)
 
@@ -212,6 +212,33 @@ p_muroid_lt5kg <- ggplot(data = rodent_lt5kg_muroid, aes(x = log(LTRL), y = log(
   theme_classic(base_size = 16)
 
 p_muroid_lt5kg
+
+```
+
+## Muroid Rodents with mass <500g
+Should be the same as the df above
+```{r}
+rodent_lt500g_muroid <- r_muriod_avg %>% 
+  filter(Mass < 500)
+
+rodent_lt500g_muroid
+```
+
+## Running regression for Muroid rodents <500g
+```{r}
+muroid_lt500g_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_lt500g_muroid)
+
+tidy(muroid_lt5kg_lm)
+glance(muroid_lt5kg_lm)
+
+p_muroid_lt500g <- ggplot(data = rodent_lt500g_muroid, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,3) +
+  ylim(0,8) +
+  theme_classic(base_size = 16)
+
+p_muroid_lt500g
 
 ```
 
@@ -271,11 +298,43 @@ p_non_muroid_lt5kg <- ggplot(data = rodent_lt5kg_non_muroid, aes(x = log(LTRL), 
 p_non_muroid_lt5kg
 ```
 
+## Creating df of Non-muroid rodents of mass <5kg
 ```{r}
-#Making a nice table of Stats
-tab_model(interspecies_lm, interspecies_small5kg_lm, show.intercept = TRUE, show.est = TRUE, show.ci = 0.95, show.se = TRUE)
+rodent_lt500g_non_muroid <- r_non_muriod_avg %>% 
+  filter(Mass < 500)
+
+rodent_lt500g_non_muroid
 
 ```
+
+## Running regression for non-muroid rodents of mass < 500g and plotting mass as a function of LTRL
+```{r}
+non_muroid_lt500g_lm <- lm(log(Mass) ~ log(LTRL), data = rodent_lt500g_non_muroid)
+
+tidy(non_muroid_lt5kg_lm)
+glance(non_muroid_lt5kg_lm)
+
+p_non_muroid_lt500g <- ggplot(data = rodent_lt500g_non_muroid, aes(x = log(LTRL), y = log(Mass))) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x) +
+  xlim(0,4) +
+  ylim(0,9) +
+  theme_classic(base_size = 16)
+
+p_non_muroid_lt500g
+```
+
+```{r}
+#Making a nice table of Stats
+tab_model(interspecies_lm, interspecies_small5kg_lm, interspecies_smol_lm, muroid_lt5kg_lm, non_muroid_lt5kg_lm, muroid_lt500g_lm,non_muroid_lt500g_lm, 
+          show.intercept = TRUE, show.est = TRUE, show.ci = 0.95, show.se = TRUE, show.p = TRUE, show.r2 = TRUE,
+          dv.labels = c("All Species", "All <5kg", "All <500g", "Muroidea <5kg", "Non-Muroidea <5kg", "Muroidea <500g", "Non-Muroidea <500g"))
+
+```
+
+![*Table 2 Hopkins 2008*](Table 2 Hopkins 2008.png)
+Comparing my results with Table 2 from the paper, you can see that the values are quite similar for all datasets and statistical parameters. One thing I do want to note is the difference in the d.f for Non-Muroidea (both mass groupings). I checked the data multiple times and I think this must have been a small error in the publication because both the dataset provided in the publication and all of my data loaded into R has corresponded to the numbers provided in my analysis. This change appears to have minimal to no impact on my results but is still worth noting as it is a distinct difference. 
+
 
 ## Showing all plots together 
 ```{r, fig.dim = c(10, 12)}
@@ -292,7 +351,7 @@ plot_grid(p_All, bottom_square, labels = c("A. all species"), label_size = 16, n
        label_x = 0.1, rel_heights = c(1, 1))
 ```
 
-
+![*Figure 2 Hopkins 2008*](Figure 2 Hopkins 2008.png)
 
 
 
