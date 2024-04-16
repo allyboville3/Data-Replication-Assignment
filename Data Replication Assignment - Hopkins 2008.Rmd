@@ -18,6 +18,10 @@ This study showed that tooth dimensions are accurate for estimating body mass wh
 
 In the following code I will replicate the regression analyses for establishing both lower toothrow length and rectangular toothrow area as proxies for estimating body mass. The fossil taxa utilized in this study did not have dental measurements provided so could not be included in this replication assignment, but summary statistics and visualizations of the proxy data can be found below.  
 
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) #hiding warning messages for whole document when knitted
+```
+
 Libraries Used
 ```{r, warning=FALSE}
 library(tidyverse)
@@ -34,6 +38,7 @@ library(sjstats)
 library(jtools)
 ```
 
+
 Loading in Dataset
 ```{r}
 rodents <- "https://raw.githubusercontent.com/allyboville3/Data-Replication-Assignment/main/Hopkins%202008%20-%20Appendix1.csv"
@@ -49,6 +54,7 @@ head(rodent_df)
 RTRA  = (LTRL X M1 width)
 
 With the acknowledgement that we are making the assumption that rodent cheek teeth are essentially rectangular in shape (and that this may result in an overestimation of body mass), area was calculated by multiplying the length of the toothrow by the width of the first lower molar. The first is most often the largest while the first and second molar are the widest. M1 width in this data refers to either the first or second molar width which can be assumed to be the same and representative of the maximum width of the toothrow. 
+
 ```{r}
 rodent_with_RTRA <- rodent_df %>% 
   mutate(RTRA = (`LTRL (mm)` * `M1 width (mm)`))
@@ -104,6 +110,7 @@ p_All <- ggplot(data = rodent_avg, aes(x = log(LTRL), y = log(Mass))) +
 
 p_All
 ```
+
 # 2. Species Less than 5kg
 Essentially is removing the four largest rodent species. This was done because for large rodents there may be different factors influencing dentition shape and size compared to smaller rodents. Including these larger taxa may result in the regression being misleading. 
 ```{r}
@@ -132,6 +139,7 @@ p_no_outlier <- ggplot(data = rodent_no_outlier, aes(x = log(LTRL), y = log(Mass
 
 p_no_outlier
 ```
+
 # 3. Species less than 500g
 Filtering data to only all species with mass <500g
 ```{r}
@@ -160,9 +168,9 @@ p_rodent_smol <- ggplot(data = rodent_smol, aes(x = log(LTRL), y = log(Mass))) +
 p_rodent_smol
 ```
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Subclade Grouping 1 - Rodents within Muroidea 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ## Filtering Data to Retain only families within Muroidea
 Have to do so with original version of df because the subclade column was removed for previous code chunks
@@ -245,9 +253,12 @@ p_muroid_lt500g <- ggplot(data = rodent_lt500g_muroid, aes(x = log(LTRL), y = lo
 p_muroid_lt500g
 
 ```
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Subclade Grouping 2 - Non-muroid Rodents
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 ## Filtering Data to be only non-muroid species
 ```{r}
